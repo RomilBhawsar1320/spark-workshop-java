@@ -80,5 +80,31 @@ public class ExplodeStructsArray {
 
         solution.show(false);
 
+        /*
+        Dataset<Row> solution = df1
+    .select(
+        col("business_id"),
+        col("full_address"),
+        explode(array(
+                struct(lit("Monday").alias("day"), col("hours.Monday").alias("info")),
+                struct(lit("Tuesday").alias("day"), col("hours.Tuesday").alias("info")),
+                struct(lit("Wednesday").alias("day"), col("hours.Wednesday").alias("info")),
+                struct(lit("Thursday").alias("day"), col("hours.Thursday").alias("info")),
+                struct(lit("Friday").alias("day"), col("hours.Friday").alias("info")),
+                struct(lit("Saturday").alias("day"), col("hours.Saturday").alias("info")),
+                struct(lit("Sunday").alias("day"), col("hours.Sunday").alias("info"))
+        )).alias("day_info")
+    )
+    .select(
+        col("business_id"),
+        col("full_address"),
+        col("day_info.day").alias("day"),
+        col("day_info.info.open").alias("open_time"),
+        col("day_info.info.close").alias("close_time")
+    );
+
+solution.show(false);
+         */
+
     }
 }
