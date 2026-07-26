@@ -143,3 +143,11 @@ public class StructsForColumnNamesAndValues {
         return spark.createDataFrame(rows, schema);
     }
 }
+
+/*
+The input contains an array<struct> column called movieRatings. First, I use explode() to convert each array element
+into a separate row. Then I extract the nested fields movieName and rating. After flattening the data,
+ I use groupBy("name") and pivot("movieName") to transform movie names into column names. Finally,
+ I use first("rating") as the aggregation function to place each rating in its corresponding movie column,
+ producing a transposed dataset.
+ */
