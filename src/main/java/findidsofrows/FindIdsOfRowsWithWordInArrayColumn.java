@@ -55,7 +55,11 @@ public class FindIdsOfRowsWithWordInArrayColumn {
                         ).alias("ids")
                 )
                 .orderBy("w");
-
+        /*
+        The join filters only the words that exist in the word column. groupBy("w") and
+        collect_list(id) aggregate all matching row IDs for each word, while sort_array()
+         ensures the IDs appear in ascending order.
+         */
         result.show(false);
 
         spark.stop();
