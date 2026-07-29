@@ -6,9 +6,9 @@ import org.apache.spark.sql.types.StructType;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
-import static org.apache.spark.sql.functions.col;
-import static org.apache.spark.sql.functions.explode;
+import static org.apache.spark.sql.functions.*;
 
 public class FlatteningArrayColumns {
     public static void main(String[] args) {
@@ -26,11 +26,28 @@ public class FlatteningArrayColumns {
         );
 
         Dataset<Row> df1 = spark.createDataFrame(rows,schema);
-        df1.show(false);
+//        df1.show(false);
         df1.printSchema();
 
-        Dataset<Row> explodeEachElement = df1.withColumn("0",explode(col("value")));
+        Dataset<Row> explodeEachElement = df1.select(posexplode(col("value")));
 //        explodeEachElement.show(false);
+
+        Dataset<Row> pivotexplode = explodeEachElement.groupBy("pos").pivot("pos")
+                .agg(functions.first("col"));
+        pivotexplode.show(false);
+
+
+
+
+
+//        Dataset<Row> exploded = df1
+//                .withColumn("id", functions.monotonically_increasing_id())
+//                .select(
+//                        col("id"),
+//                        functions.posexplode(col("value"))
+//                );
+//
+//        exploded.show(false);
 
         Dataset<Row> solution = df1.select(
                 col("value").getItem(0).alias("0"),
@@ -39,6 +56,8 @@ public class FlatteningArrayColumns {
         );
 
         solution.show(false); //(assuming all arrays have the same length)
+
+
 
 
     }

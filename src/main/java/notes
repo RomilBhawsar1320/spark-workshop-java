@@ -1,0 +1,253 @@
+What Happens When a Spark Job Is Submitted?
+
+Answer
+
+User submits a Spark application using spark-submit or through a service such as Dataproc, YARN, or Kubernetes.
+
+The Driver Program starts and creates the SparkSession.
+
+Spark reads all transformations and creates a DAG (Directed Acyclic Graph).
+
+The DAG Scheduler analyzes the DAG and breaks it into stages.
+
+Shuffle operations such as join, groupBy, and reduceByKey create stage boundaries.
+
+Each stage is divided into tasks based on the number of partitions.
+
+The Cluster Manager allocates resources and launches executors on worker nodes.
+
+The Task Scheduler assigns tasks to executors.
+
+Executors process data in parallel and perform the required transformations.
+
+If a shuffle operation is present, data is exchanged between executors.
+
+An action such as count(), collect(), show(), or save() triggers actual execution.
+
+Executors return results to the Driver.
+
+The Driver collects results, updates Spark UI metrics, and the job completes.
+
+Important Components
+
+Driver
+
+Creates execution plan.
+
+Coordinates executors.
+
+Receives results.
+
+Executor
+
+Executes tasks.
+
+Stores cached data.
+
+Perform transformations and actions.
+
+
+
+DAG Scheduler
+
+Converts DAG into stages.
+
+Task Scheduler
+
+Converts stages into tasks and assigns them to executors.
+
+Cluster Manager
+
+Allocates resources.
+
+Examples: YARN, Kubernetes, Dataproc, Standalone.
+
+
+Interview Answer (1 Minute)
+
+"When a Spark job is submitted, the Driver Program creates a DAG based on all transformations. The DAG Scheduler divides the DAG into stages, and the Task Scheduler further divides stages into tasks. A Cluster Manager allocates executors, and tasks are distributed across them. Executors process data in parallel, perform transformations, and exchange data during shuffle operations when required. Once an action such as count() or show() is triggered, the job executes and results are returned to the Driver."
+
+If Java Streams/Parallel Streams can process data and databases can run SQL queries, then why do we need Spark and Spark SQL?
+
+Spark exists because Java Streams and traditional databases cannot efficiently process massive distributed datasets across hundreds or thousands of machines.
+
+Why use Spark when Java Streams and Parallel Streams already exist?
+
+Answer
+
+Java Streams and Parallel Streams are designed for processing data within a single JVM running on a single machine.
+
+Parallel Streams can utilize multiple CPU cores of the same machine, but they cannot distribute work across multiple machines.
+
+When data grows from GBs to TBs or PBs, a single machine becomes a bottleneck because of limitations in:
+
+Memory
+
+CPU
+
+Storage
+
+Network bandwidth
+
+Spark solves this problem by distributing data and computation across a cluster of machines.
+
+where each machine processes a small portion of the data.
+
+Spark automatically handles:
+
+Data distribution
+
+Parallel execution
+
+Fault tolerance
+
+Resource management
+
+which Java Streams cannot do.
+
+Key Points
+
+✅ Java Streams run on a single machine.
+
+✅ Parallel Streams use multiple CPU cores but still on one machine.
+
+✅ Cannot process huge datasets that exceed machine memory.
+
+✅ No built-in fault tolerance.
+
+✅ Spark distributes processing across many machines.
+
+✅ Spark can handle TBs and PBs of data.
+
+Interview Summary
+
+Java Streams and Parallel Streams are suitable for single-machine processing and in-memory datasets. Spark is designed for distributed computing, allowing massive datasets to be processed across many machines with scalability and fault tolerance.
+
+Question 2:
+
+If databases can run SQL queries, why do we need Spark SQL?
+
+Answer
+
+Traditional databases are excellent for transactional systems and moderate-sized analytics workloads.
+
+SELECT department,
+
+AVG(salary)
+
+FROM employees
+
+GROUP BY department;
+
+Databases work well when data is stored inside database tables.
+
+However, modern organizations store massive amounts of data in:
+
+CSV files
+
+JSON files
+
+Parquet files
+
+Data Lakes
+
+HDFS
+
+AWS S3
+
+Azure Data Lake
+
+Loading hundreds of terabytes into a traditional database can be expensive and difficult.
+
+Spark SQL allows querying this data directly without first importing it into a database.
+
+SELECT *
+
+FROM parquet.`s3://sales-data`;
+
+Spark SQL provides SQL capabilities on distributed storage systems and executes queries across multiple machines.
+
+Key Points
+
+✅ Database SQL works on database tables.
+
+✅ Spark SQL can query files directly.
+
+✅ Works with Data Lakes and cloud storage.
+
+✅ Handles massive datasets.
+
+✅ Reduces dependence on expensive database infrastructure.
+
+Interview Summary
+
+Spark SQL extends SQL processing to distributed datasets stored in data lakes and cloud storage systems. It enables large-scale analytics without requiring all data to be stored inside a traditional database.
+
+Question 3:
+
+What are the scaling limitations of Java Streams compared to Spark?
+
+Answer
+
+Java Streams scale vertically. Vertical scaling means increasing resources on a single machine:
+
+More CPU More RAM More Storage But there is always a hardware limit. Java Application
+
+32 GB RAM cannot process 10 TB dataset
+
+entirely in memory. Spark scales horizontally. Horizontal scaling means:
+
+Add More Machines
+
+10 Machines
+
+100 Machines
+
+1000 Machines
+
+
+
+Spark automatically distributes the workload among available machines.
+
+Key Points
+
+✅ Java Streams = Vertical Scaling.
+
+✅ Spark = Horizontal Scaling.
+
+✅ Hardware eventually limits Java applications.
+
+✅ Spark can keep growing by adding machines.
+
+
+
+Interview Summary
+
+Java Streams rely on vertical scaling of a single machine, whereas Spark supports horizontal scaling across many machines, enabling the processing of extremely large datasets.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
