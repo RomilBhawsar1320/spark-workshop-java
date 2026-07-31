@@ -1,0 +1,394 @@
+Introduction
+
+"Hi, my name is Romil Bhawsar. I am currently working as a Lead Engineer at Nitor Infotech and have around 7 years of experience in software development, primarily in Java, Spring Boot, Microservices, Apache Spark, SQL, and cloud technologies.
+
+For the last 1 year and 3 months, I have been working on the TransUnion modernization project where I am involved in application modernization, code conversion, validation, and data processing initiatives. One of my key contributions has been participating in the ABI2JAVA program, where legacy Ab Initio workflows are being converted into Java and Spring Boot based applications to improve maintainability and scalability.
+
+I have extensive experience in designing and developing REST APIs, implementing microservices architecture, and applying patterns such as Circuit Breaker and Retry Pattern. I have also worked on automation POCs, model validation activities, Attribute Builder Rationalization and executed more than 800 models to ensure platform parity between legacy and modernized systems.
+
+On the Big Data side, I have worked with Apache Spark and Spark SQL for processing large datasets. I have been involved in creating and optimizing Spark-based data processing pipelines, understanding DAG execution, transformations, actions, partitioning, and distributed processing concepts.
+
+Previously, I worked on financial domain applications where I developed enterprise-grade microservices using Spring Boot, Hibernate, JPA, and React. Throughout my career, I have collaborated closely with cross-functional teams, resolved production issues, performed root-cause analysis, and contributed to CI/CD and cloud adoption initiatives on AWS and GCP.
+
+Overall, I enjoy solving complex engineering problems and building scalable, high-performance applications."
+
+
+
+What happens when a spark job is submitted ?
+
+A Spark job starts when an Action operation such as count(), collect(), save(), or reduce() is invoked. Till then, Spark only records the transformations due to lazy evaluation.
+
+The Driver Program creates a logical execution plan and the DAG Scheduler converts the transformations into a DAG (Directed Acyclic Graph). Based on shuffle boundaries, the DAG is divided into multiple stages.
+
+The Task Scheduler further breaks each stage into tasks. The Driver requests resources from the Cluster Manager (YARN/Kubernetes/Standalone), which launches Executors on worker nodes.
+
+Tasks are distributed to Executors and executed in parallel on data partitions. If a shuffle operation such as groupByKey, join, or reduceByKey occurs, Spark creates a new stage.
+
+Once all stages are completed successfully, the results are returned to the Driver or stored in the target system.
+
+Q3. Difference between repartition() and coalesce() in Spark?
+
+Repartition and Coalesce are both used to change the number of partitions in Spark.
+
+Repartition performs a full shuffle of the data and can be used to either increase or decrease partitions. Since data is redistributed across all partitions, it is more expensive but results in better load balancing.
+
+Coalesce is mainly used to reduce the number of partitions. It tries to avoid a full shuffle by merging existing partitions, making it faster and more efficient.
+
+If I want to increase parallelism or achieve better data distribution before a join operation, I use repartition. If I want to reduce the number of output files before writing data, I typically use coalesce.
+
+Q4. What is the difference between groupByKey() and reduceByKey()?
+
+groupByKey()
+
+Groups all values for the same key.
+
+Sends all records across the network before aggregation.
+
+Creates huge shuffle traffic.
+
+High memory consumption.
+
+reduceByKey()
+
+Performs local aggregation on each partition first (combiner).
+
+Sends only aggregated results during shuffle.
+
+Much less network I/O.
+
+Better performance.
+
+reduceByKey() performs better because it does map-side aggregation before shuffling data across the network. groupByKey() sends all values for a key over the network and then performs aggregation, which increases shuffle size, memory usage, and execution time.
+
+Q5. What is Data Skew in Spark?
+
+
+
+Data Skew occurs when data is not distributed evenly across partitions. Some partitions contain significantly more records than others, causing a few executors to process much more data while the remaining executors sit idle.
+
+For example, if one partition contains 10 GB of data and another contains only 1 GB, the executor processing the 10 GB partition becomes the bottleneck and increases overall job execution time.
+
+To identify data skew:
+
+Check Spark UI
+
+Monitor stage execution time
+
+Look for tasks taking significantly longer than others
+
+Check partition sizes and shuffle metrics
+
+To solve data skew:
+
+Repartition data appropriately
+
+Use salting for heavily skewed keys
+
+Use broadcast joins when one dataset is small
+
+Filter unnecessary data before joins
+
+Increase parallelism where appropriate
+
+
+
+Q6. Difference between cache() and persist() in Spark?
+
+Both cache() and persist() are used to store intermediate results so Spark does not have to recompute the lineage every time the dataset is used.
+
+cache() is a shorthand for persist(StorageLevel.MEMORY_AND_DISK) in modern Spark DataFrame APIs. It stores data in memory and spills to disk if required.
+
+persist() is more flexible because it allows us to choose different storage levels such as:
+
+MEMORY_ONLY
+
+MEMORY_AND_DISK
+
+DISK_ONLY
+
+MEMORY_ONLY_SER
+
+
+
+If a DataFrame is reused multiple times, caching avoids executing all transformations again and improves performance significantly.
+
+I typically use cache() when the default storage level is sufficient and use persist() when I need more control over memory and disk usage.
+
+Q7. Suppose you have two Spark DataFrames:
+
+Customer Table = 500 GB
+
+Country Table = 5 MB
+
+Questions:
+
+Which type of join optimization would you use?
+
+What is a Broadcast Join?
+
+Why is it faster than a normal join?
+
+How do you implement it in Spark?
+
+Since the Country table is only 5 MB and the Customer table is 500 GB, I would use a Broadcast Join.
+
+In a normal join, Spark shuffles both datasets across executors, which generates significant network traffic and increases execution time.
+
+In a Broadcast Join, Spark broadcasts the smaller table (Country table) to every executor node. Each executor keeps a local copy of that small dataset and joins it with its local partition of the large Customer table.
+
+Since the smaller table is already available locally on every executor, Spark avoids the expensive shuffle phase, making the join significantly faster.
+
+import static org.apache.spark.sql.functions.broadcast;
+
+
+
+Dataset<Row> result = customerDf.join(
+
+broadcast(countryDf),
+
+"country_id"
+
+);
+
+
+
+I typically use Broadcast Join when one of the datasets is small enough to fit into executor memory.
+
+
+
+
+
+
+
+Q8. Difference between HashMap and ConcurrentHashMap?
+
+Explain:
+
+Is HashMap thread-safe?
+
+How does ConcurrentHashMap achieve thread safety?
+
+Can ConcurrentHashMap store null keys and values?
+
+When would you choose ConcurrentHashMap?
+
+
+
+
+
+HashMap is not thread-safe and should not be used when multiple threads are modifying the map concurrently.
+
+ConcurrentHashMap is thread-safe and designed for concurrent access. Instead of locking the entire map, it uses finer-grained locking and CAS (Compare-And-Swap) operations to improve performance.
+
+Both HashMap and ConcurrentHashMap internally use buckets. When multiple keys map to the same bucket, entries are stored as a linked list and later converted into a red-black tree when the bucket size exceeds a threshold.
+
+HashMap allows one null key and multiple null values, whereas ConcurrentHashMap does not allow null keys or null values.
+
+I use ConcurrentHashMap whenever multiple threads need to read and update shared data safely.
+
+
+
+
+
+
+
+Q9. What is the difference between Runnable, Callable, and CompletableFuture?
+
+Explain:
+
+Does Runnable return a value?
+
+Does Callable return a value?
+
+What problem does CompletableFuture solve?
+
+Give a real-world use case where you would use CompletableFuture.
+
+
+
+Runnable is used when we want to execute a task in a separate thread and it does not return any result.
+
+Callable is similar to Runnable but can return a value and can throw checked exceptions.
+
+Callable is usually executed using an ExecutorService and returns a Future object.
+
+The limitation of Future was that it supports only blocking retrieval using get() and does not support chaining of asynchronous operations.
+
+CompletableFuture, introduced in Java 8, solves this problem by providing non-blocking asynchronous programming. It supports chaining, combining multiple asynchronous operations, exception handling, and parallel execution.
+
+Common methods include:
+
+supplyAsync()
+
+runAsync()
+
+thenApply()
+
+thenCompose()
+
+thenCombine()
+
+exceptionally()
+
+For example, in an e-commerce application, I can call User Service and Product Service in parallel and combine the results using CompletableFuture, reducing the overall response time.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Q1. How does Spark internally work once a job is submitted?
+
+This should become your standard answer.
+
+Spark job starts when an Action is triggered such as collect(), count(), save(), show().
+
+Spark Driver creates a logical execution plan and all transformations are stored because Spark follows lazy evaluation.
+
+DAG Scheduler creates a Directed Acyclic Graph and divides the job into multiple stages based on shuffle boundaries.
+
+Task Scheduler further divides stages into tasks.
+
+Driver requests resources from Cluster Manager (YARN/Kubernetes/Dataproc).
+
+Executors are launched on worker nodes.
+
+Tasks are distributed across executors and executed in parallel on partitions.
+
+Results are returned to Driver or written to storage.
+
+Q2. How does Spark optimize a job?
+
+This is highly likely.
+
+Expected Answer:
+
+Spark optimizes jobs using multiple techniques:
+
+Lazy Evaluation
+
+Catalyst Optimizer
+
+Tungsten Execution Engine
+
+Predicate Pushdown
+
+Column Pruning
+
+Broadcast Join
+
+Partition Pruning
+
+Cache and Persist
+
+Whole-stage code generation
+
+In our project, we mainly optimized using partitioning, caching, reducing shuffle operations, and broadcast joins.
+
+Lazy Evaluation
+
+Spark does not execute transformations immediately.
+
+It builds a DAG (execution plan) and optimizes the entire workflow before execution.
+
+Catalyst Optimizer
+
+Spark SQL's query optimizer.
+
+It improves execution plans using rule-based and cost-based optimizations such as filter pushdown and join reordering.
+
+Tungsten Execution Engine
+
+Improves CPU and memory efficiency.
+
+Uses optimized memory management and binary processing to reduce garbage collection overhead.
+
+Predicate Pushdown
+
+Filters are pushed to the data source level.
+
+Only the required rows are read, reducing I/O, and improving performance.
+
+Column Pruning
+
+Spark reads only the columns used in the query.
+
+This reduces data transfer and memory usage.
+
+     6.    Broadcast Join
+
+Small tables are broadcast to all executors.
+
+Avoids expensive shuffle operations during joins.
+
+Partition Pruning
+
+Spark scans only relevant partitions based on filter conditions.
+
+Example: Reading only year=2025 partition instead of the entire dataset.
+
+Cache and Persist
+
+Stores frequently used DataFrames/RDDs in memory (or disk).
+
+Prevents recomputation and speeds up repeated operations.
+
+Whole-Stage Code Generation
+
+Spark generates optimized Java bytecode for multiple operators together.
+
+Reduces function call overhead and improves execution speed.
+
+Project-Based Answer
+
+In my project, we mainly improved Spark performance using proper partitioning, caching frequently used DataFrames, reducing shuffle operations, predicate pushdown, and broadcast joins for small lookup tables. These optimizations significantly reduced execution time and resource consumption.
+
+
+
+Q3. When can a Spark Job become slow?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
