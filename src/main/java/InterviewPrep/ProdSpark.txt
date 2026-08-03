@@ -1,0 +1,861 @@
+1. Explain One Major Spark Production Issue You Resolved
+Interviewer's Expectation
+
+They want to know:
+
+Your troubleshooting ability
+Understanding of Spark internals
+Root Cause Analysis (RCA)
+Preventive measures
+Sample Answer
+Problem
+
+A daily Spark ETL job processing 500 GB data suddenly started taking 4 hours instead of 45 minutes.
+
+Investigation
+
+Checked:
+
+Spark UI
+Stage metrics
+Executor logs
+Shuffle statistics
+
+Found that:
+
+One executor was processing 80% of records
+Remaining executors were idle
+
+This indicated data skew.
+
+Root Cause
+
+A customer_id column had one value appearing 200 million times.
+
+SQL
+1
+customer_id = 12345
+2
+``
+Show more lines
+
+Most records landed in one partition.
+
+Solution
+
+Implemented salting technique:
+
+Python
+1
+from pyspark.sql.functions import rand
+2
+ 
+3
+df = df.withColumn(
+4
+"salt",
+5
+(rand()*10).cast("int")
+6
+)
+Show more lines
+
+Joined using:
+
+Python
+1
+customer_id + salt
+Show more lines
+Result
+Runtime reduced from 4 hours to 50 min
+Cluster utilization improved from 30% to 85%
+Prevention
+
+Added:
+
+Data quality checks
+Skew monitoring dashboard
+AQE skew join handling
+2. How Do You Identify and Fix Data Skew?
+What Is Data Skew?
+
+When some partitions have significantly more data than others.
+
+Example:
+
+Partition	RecordsP1	10M
+P2	12M
+P3	8M
+P4	500M
+
+P4 becomes bottleneck.
+
+How To Identify
+1. Spark UI
+
+Look for:
+
+Task duration imbalance
+Long-running tasks
+
+Example:
+
+Plain Text
+1
+Task 1 = 5 sec
+2
+Task 2 = 6 sec
+3
+Task 3 = 7 sec
+4
+Task 4 = 25 min
+Show more lines
+
+Skew suspected.
+
+2. Check Key Distribution
+Python
+1
+df.groupBy("customer_id").count()\
+2
+.orderBy("count", ascending=False)
+Show more lines
+3. Executor Metrics
+
+Observe:
+
+Executor CPU
+Shuffle Read Size
+GC Time
+Solutions
+Option 1: Salting
+Python
+1
+df.withColumn("salt", rand()*10)
+Show more lines
+Option 2: Broadcast Join
+
+If one table is small.
+
+Python
+1
+broadcast(dim_df)
+Show more lines
+Option 3: AQE Skew Join
+Python
+1
+spark.conf.set(
+2
+"spark.sql.adaptive.skewJoin.enabled",
+3
+"true"
+4
+)
+Show more lines
+Option 4: Repartition
+Python
+1
+df.repartition(100, "customer_id")
+2
+``
+Show more lines
+3. Spark Job Running Slow. Investigation Steps?
+
+This is one of the most common production questions.
+
+Step 1: Check Spark UI
+
+Focus on:
+
+Jobs
+Stages
+Tasks
+
+Check:
+
+Plain Text
+1
+Long stage?
+2
+Long task?
+3
+Shuffle?
+4
+Spill?
+Show more lines
+Step 2: Look For Data Skew
+
+Signs:
+
+Few tasks running longer
+Executors idle
+Step 3: Check Shuffle Size
+
+Example:
+
+Plain Text
+1
+Input: 50GB
+2
+Shuffle: 1.2TB
+Show more lines
+
+Something wrong.
+
+Step 4: Check Joins
+
+Determine:
+
+Sort Merge Join?
+Broadcast Join?
+Cartesian Join?
+Python
+1
+df.explain(True)
+Show more lines
+Step 5: Examine Partition Count
+
+Too few:
+
+Plain Text
+1
+4 partitions
+2
+200 executors
+Show more lines
+
+Resources wasted.
+
+Too many:
+
+Plain Text
+1
+50000 partitions
+Show more lines
+
+Scheduling overhead.
+
+Step 6: Check Executor Metrics
+
+Look for:
+
+Plain Text
+1
+Spill to disk
+2
+GC time
+3
+Memory pressure
+4
+OOM
+Show more lines
+Step 7: Analyze DAG
+
+Use:
+
+Python
+1
+df.explain("formatted")
+Show more lines
+Typical Causes
+Data skew
+Too much shuffle
+Poor partitioning
+Executor memory shortage
+Wrong join strategy
+Small files problem
+4. Driver OOM vs Executor OOM
+Driver OOM
+Definition
+
+Driver JVM memory exhausted.
+
+Common Causes
+collect()
+Python
+1
+df.collect()
+Show more lines
+
+Brings all data to driver.
+
+toPandas()
+Python
+1
+df.toPandas()
+Show more lines
+
+Danger for large datasets.
+
+Huge Broadcast Variables
+Python
+1
+broadcast(big_table)
+Show more lines
+Symptoms
+
+Driver logs:
+
+Plain Text
+1
+java.lang.OutOfMemoryError
+Show more lines
+
+Job often crashes immediately.
+
+Executor OOM
+Definition
+
+Executor memory exhausted while processing partitions.
+
+Causes
+
+Large partition:
+
+Plain Text
+1
+Partition = 20 GB
+2
+Executor Memory = 8 GB
+Show more lines
+
+Heavy shuffle.
+
+Wide transformations.
+
+Symptoms
+Plain Text
+1
+Container killed by YARN
+2
+Executor Lost
+3
+Executor Exit Code 137
+Show more lines
+Solutions
+Driver OOM
+
+Avoid:
+
+Python
+1
+collect()
+2
+``
+Show more lines
+
+Use:
+
+Python
+1
+take(100)
+2
+show()
+Show more lines
+Executor OOM
+
+Increase:
+
+Python
+1
+spark.executor.memory
+2
+``
+Show more lines
+
+Or:
+
+Python
+1
+repartition()
+Show more lines
+
+Reduce partition size.
+
+5. How Do You Optimize Joins?
+Interview Focus
+
+They want understanding of join strategies.
+
+1. Broadcast Join
+
+Best for small dimension table.
+
+Python
+1
+broadcast(dim_df)
+Show more lines
+
+Example:
+
+Plain Text
+1
+Fact = 500 GB
+2
+Dimension = 100 MB
+Show more lines
+
+No shuffle.
+
+Fastest.
+
+2. Bucketed Join
+
+Both tables bucketed on same key.
+
+SQL
+1
+CLUSTERED BY(customer_id)
+Show more lines
+
+Reduces shuffle.
+
+3. Filter Before Join
+
+Bad:
+
+Python
+1
+fact.join(dim)
+2
+.filter(...)
+Show more lines
+
+Good:
+
+Python
+1
+fact.filter(...)
+2
+.join(dim)
+Show more lines
+4. AQE
+
+Automatically converts:
+
+Plain Text
+1
+Sort Merge Join
+2
+→ Broadcast Join
+Show more lines
+
+when possible.
+
+5. Fix Skew
+
+Use:
+
+Salting
+AQE skew join
+Join Types Performance
+
+Fastest to Slowest:
+
+Plain Text
+1
+Broadcast Hash Join
+2
+Bucket Join
+3
+Sort Merge Join
+4
+Shuffle Hash Join
+5
+Cartesian Join
+Show more lines
+6. repartition vs coalesce
+
+This question is asked almost every Spark interview.
+
+repartition()
+Characteristics
+Full shuffle
+Increase/decrease partitions
+Python
+1
+df.repartition(200)
+Show more lines
+Use Cases
+Better parallelism
+Distribution balancing
+Example
+Python
+1
+df.repartition(500)
+Show more lines
+
+Creates even partitions.
+
+coalesce()
+Characteristics
+No full shuffle
+Mostly reduce partitions
+Python
+1
+df.coalesce(20)
+Show more lines
+Use Cases
+
+Write fewer output files.
+
+Example
+
+Before:
+
+Plain Text
+1
+300 files
+Show more lines
+
+After:
+
+Python
+1
+coalesce(10)
+Show more lines
+
+Output:
+
+Plain Text
+1
+10 files
+Show more lines
+Interview One-Liner
+
+repartition performs full shuffle and can increase or decrease partitions; coalesce minimizes data movement and is mainly used to decrease partitions.
+
+7. Explain AQE (Adaptive Query Execution)
+What Is AQE?
+
+Spark dynamically modifies execution plan during runtime based on actual statistics.
+
+Introduced in Spark 3.
+
+Why Needed?
+
+Planner estimates can be wrong.
+
+Example:
+
+Estimated:
+
+Plain Text
+1
+5 GB
+Show more lines
+
+Actual:
+
+Plain Text
+1
+20 MB
+Show more lines
+
+AQE can optimize.
+
+Features
+1. Dynamic Broadcast Join
+
+Converts:
+
+Plain Text
+1
+Sort Merge Join
+2
+→ Broadcast Join
+Show more lines
+2. Skew Join Handling
+
+Splits skewed partitions automatically.
+
+3. Partition Coalescing
+
+Combines small shuffle partitions.
+
+Enable AQE
+Python
+1
+spark.conf.set(
+2
+"spark.sql.adaptive.enabled",
+3
+"true"
+4
+)
+Show more lines
+Production Benefits
+Faster execution
+Less shuffle
+Better resource utilization
+Automatic skew mitigation
+8. How Do You Tune Spark Configurations?
+Start With Metrics
+
+Never randomly increase memory.
+
+Check:
+
+Spark UI
+Ganglia
+Dataproc monitoring
+Executor logs
+Important Configurations
+Executor Memory
+Python
+1
+spark.executor.memory=8g
+Show more lines
+
+Controls executor heap.
+
+Executor Cores
+Python
+1
+spark.executor.cores=4
+Show more lines
+
+Typical range:
+
+Plain Text
+1
+3 to 5
+Show more lines
+
+Avoid very high values.
+
+Number of Executors
+Python
+1
+spark.executor.instances=50
+Show more lines
+
+Depends on workload.
+
+Shuffle Partitions
+
+Default:
+
+Python
+1
+spark.sql.shuffle.partitions=200
+Show more lines
+
+Increase for large data.
+
+Example:
+
+Python
+1
+1000
+Show more lines
+Dynamic Allocation
+Python
+1
+spark.dynamicAllocation.enabled=true
+Show more lines
+
+Auto scales executors.
+
+Tuning Approach
+Analyze Spark UI
+Identify bottleneck
+Modify one parameter
+Re-test
+Compare metrics
+9. How Do You Reduce Dataproc Cost?
+
+Very common for GCP projects.
+
+1. Autoscaling
+
+Enable:
+
+Plain Text
+1
+Cluster Autoscaling
+2
+ 
+Show more lines
+
+Workers added only when needed.
+
+2. Preemptible Workers
+
+Cost reduction:
+
+Plain Text
+1
+60% to 80%
+Show more lines
+
+Cheaper VMs.
+
+Use for non-critical executors.
+
+3. Right-Sizing
+
+Avoid:
+
+Plain Text
+1
+50 nodes for 10GB data
+Show more lines
+
+Analyze utilization.
+
+4. Optimize Spark Jobs
+
+Less runtime = less cost.
+
+Focus on:
+
+AQE
+Broadcast joins
+Partition tuning
+Caching
+5. Use Ephemeral Clusters
+
+Create:
+
+Plain Text
+1
+Job Start
+Show more lines
+
+Delete:
+
+Plain Text
+1
+Job End
+Show more lines
+
+No idle cluster cost.
+
+6. Storage Optimization
+
+Store in:
+
+Plain Text
+1
+Parquet
+2
+ORC
+3
+``
+Show more lines
+
+instead of CSV.
+
+Strong Interview Answer
+
+I reduce Dataproc cost using autoscaling, preemptible workers, ephemeral clusters, efficient storage formats such as Parquet, AQE-based query optimization, and continuous monitoring of CPU and memory utilization to prevent over-provisioning.
+
+10. Explain End-to-End Architecture Of Your Current Project
+
+This question tests your overall ownership.
+
+Example Architecture (Dataproc + Spark + GCP)
+Data Sources
+Plain Text
+1
+CRM Database
+2
+Application Logs
+3
+Kafka Streams
+4
+External APIs
+Show more lines
+
+↓
+
+Ingestion Layer
+Plain Text
+1
+Kafka
+2
+Pub/Sub
+3
+Sqoop
+Show more lines
+
+↓
+
+Raw Storage
+Plain Text
+1
+Google Cloud Storage
+Show more lines
+
+Raw Zone
+
+↓
+
+Processing Layer
+Plain Text
+1
+Dataproc Spark Jobs
+Show more lines
+
+Tasks:
+
+Cleansing
+Validation
+Enrichment
+Deduplication
+
+↓
+
+Curated Layer
+Plain Text
+1
+Parquet Tables
+Show more lines
+
+Partitioned by:
+
+Plain Text
+1
+date
+2
+region
+Show more lines
+
+↓
+
+Warehouse
+Plain Text
+1
+BigQuery
+Show more lines
+
+↓
+
+Reporting
+Plain Text
+1
+Looker
+2
+Power BI
+3
+Tableau
+4
+ 
+Show more lines
+Sample Interview Answer
+
+In my current project, data comes from Kafka and transactional databases into GCS. Spark jobs running on Dataproc process raw data, apply validation, deduplication, and business transformations, then write partitioned Parquet datasets into curated storage. The processed data is loaded into BigQuery for analytics and reporting through Looker dashboards. We use Airflow for orchestration, Cloud Monitoring for observability, and CI/CD pipelines for automated deployment of Spark jobs.
+
+Quick Production Interview Cheat Sheet
+Topic	Key PointSlow Job	Spark UI → Skew → Shuffle → Join → Memory
+Skew	Salting, AQE, Broadcast
+Driver OOM	collect(), toPandas()
+Executor OOM	Large partitions, shuffle
+Join Optimization	Broadcast Join first choice
+Repartition	Full shuffle
+Coalesce	Reduce partitions
+AQE	Runtime optimization
+Spark Tuning	Memory, Cores, Partitions
+Dataproc Cost	Autoscaling + Preemptible VMs
+Architecture	Source → Ingestion → Spark → Storage → BI
